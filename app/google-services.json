@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "962366033380",
+    "project_id": "inovasi-online-b56b6",
+    "storage_bucket": "inovasi-online-b56b6.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:962366033380:android:42f6e938e7a33e8e7f4bf1",
+        "android_client_info": {
+          "package_name": "com.inovasionline.twa"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBUClz3FZvWgB12VQiKMRO9hOObW6KVtvo"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
