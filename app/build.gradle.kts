@@ -55,16 +55,24 @@ dependencies {
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
 
+    // ✅ Credential Manager (pakai SATU versi saja)
+    implementation(libs.androidx.credentials)
+    implementation(libs.androidx.credentials.play.services.auth)
+    implementation(libs.googleid)
+
+    implementation(libs.androidx.lifecycle.runtime.ktx)
+    implementation(libs.kotlinx.coroutines.android)
+
     implementation(libs.androidx.browser)
     implementation(libs.androidbrowserhelper)
     implementation(libs.androidx.core.splashscreen)
+
+    implementation(libs.play.services.auth)
 
     // Firebase
     implementation(platform(libs.firebase.bom))
     implementation(libs.firebase.messaging)
 
     implementation(libs.androidx.work.runtime.ktx)
-
     implementation(libs.okhttp)
-    implementation(libs.androidx.browser.v170)
 }

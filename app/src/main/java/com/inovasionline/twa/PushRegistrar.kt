@@ -1,6 +1,5 @@
 package com.inovasionline.twa
 
-import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
@@ -17,7 +16,7 @@ import java.util.concurrent.atomic.AtomicBoolean
 
 object PushRegistrar {
 
-    private const val TAG = "PushRegistrar"
+    private const val TAG = "RIO_DEBUG"
 
     private const val PREF = "push"
     private const val KEY_TOKEN = "fcm_token"
@@ -65,23 +64,18 @@ object PushRegistrar {
                         val url =
                             "https://inovasionline.com/bind-device?code=$code"
 
-                        val intent = Intent(Intent.ACTION_VIEW).apply {
-                            data = Uri.parse(url)
-
-                            component = ComponentName(
-                                appContext.packageName,
-                                "com.google.androidbrowserhelper.trusted.LauncherActivity"
-                            )
-
+                        val intent = Intent(appContext, MainActivity::class.java).apply {
+                            putExtra("open_url", url)
                             addFlags(
                                 Intent.FLAG_ACTIVITY_NEW_TASK or
-                                        Intent.FLAG_ACTIVITY_CLEAR_TASK
+                                        Intent.FLAG_ACTIVITY_CLEAR_TOP
                             )
                         }
 
                         Handler(Looper.getMainLooper()).post {
                             try {
                                 appContext.startActivity(intent)
+                                opening.set(false)
                             } catch (e: Exception) {
                                 opening.set(false)
                                 Log.e(TAG, "Failed to open bind page", e)
@@ -129,7 +123,7 @@ object PushRegistrar {
                 response.use {
 
                     val raw = try {
-                        it.body.string()
+                        it.body?.string()
                     } catch (_: Exception) {
                         null
                     }

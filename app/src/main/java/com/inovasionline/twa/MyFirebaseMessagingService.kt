@@ -3,15 +3,12 @@ package com.inovasionline.twa
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
-import android.content.Context
 import android.content.Intent
 import android.os.Build
 import androidx.core.app.NotificationCompat
-import androidx.core.net.toUri
 import androidx.core.content.edit
 import com.google.firebase.messaging.FirebaseMessagingService
 import com.google.firebase.messaging.RemoteMessage
-import com.google.androidbrowserhelper.trusted.LauncherActivity
 
 class MyFirebaseMessagingService : FirebaseMessagingService() {
 
@@ -26,6 +23,7 @@ class MyFirebaseMessagingService : FirebaseMessagingService() {
     }
 
     override fun onNewToken(token: String) {
+
         val prefs = getSharedPreferences(PREF, MODE_PRIVATE)
 
         prefs.edit {
@@ -39,16 +37,15 @@ class MyFirebaseMessagingService : FirebaseMessagingService() {
 
         val title = message.notification?.title ?: "Inovasi Online"
         val body = message.notification?.body ?: ""
-
         val targetUrl =
             message.data["url"] ?: "https://inovasionline.com"
 
-        val intent = Intent(
-            Intent.ACTION_VIEW,
-            targetUrl.toUri()
-        ).apply {
-            setClass(this@MyFirebaseMessagingService, LauncherActivity::class.java)
-            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        val intent = Intent(this, MainActivity::class.java).apply {
+            putExtra("open_url", targetUrl)
+            addFlags(
+                Intent.FLAG_ACTIVITY_NEW_TASK or
+                        Intent.FLAG_ACTIVITY_CLEAR_TOP
+            )
         }
 
         val pendingIntent = PendingIntent.getActivity(
@@ -59,7 +56,7 @@ class MyFirebaseMessagingService : FirebaseMessagingService() {
         )
 
         val manager =
-            getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+            getSystemService(NOTIFICATION_SERVICE) as NotificationManager
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val channel = NotificationChannel(
