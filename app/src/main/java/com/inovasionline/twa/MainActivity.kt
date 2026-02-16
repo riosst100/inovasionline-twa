@@ -81,8 +81,6 @@ class MainActivity : AppCompatActivity() {
                     handleLoginFailed("Login gagal")
                 }
 
-            } else {
-                handleLoginFailed("Login dibatalkan")
             }
         }
 
@@ -109,6 +107,7 @@ class MainActivity : AppCompatActivity() {
         val cookieManager = CookieManager.getInstance()
         cookieManager.setAcceptCookie(true)
         cookieManager.setAcceptThirdPartyCookies(webView, true)
+        cookieManager.flush();
 
         val gso = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
             .requestIdToken(WEB_CLIENT_ID)
@@ -121,6 +120,11 @@ class MainActivity : AppCompatActivity() {
         checkLoginFirst()
         checkAndRefreshFcmTokenIfNeeded()
         PushRegistrar.ensureRegistered(this)
+    }
+
+    override fun onPause() {
+        super.onPause()
+        CookieManager.getInstance().flush()
     }
 
     override fun onResume() {
@@ -254,14 +258,17 @@ class MainActivity : AppCompatActivity() {
 
         webView.postDelayed({
 
+            // 🔥 FLUSH COOKIE WAJIB
+            CookieManager.getInstance().flush()
+
             isLoginInProgress = false
             hideLoading()
 
-            checkNotificationPermission() // ✅ MUNCUL SETELAH LOGIN SAJA
+            checkNotificationPermission()
 
-            webView.loadUrl(HOME_URL)
+//            webView.loadUrl(HOME_URL)
 
-        }, 800)
+        }, 1200) // kasih delay sedikit lebih lama
     }
 
     // ================= NOTIFICATION =================
