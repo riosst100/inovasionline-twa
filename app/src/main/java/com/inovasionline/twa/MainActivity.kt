@@ -264,7 +264,7 @@ class MainActivity : AppCompatActivity() {
             isLoginInProgress = false
             hideLoading()
 
-            checkNotificationPermission()
+            delayNotificationPermission()
 
 //            webView.loadUrl(HOME_URL)
 
@@ -372,5 +372,12 @@ class MainActivity : AppCompatActivity() {
         val prefs = getSharedPreferences(PREF, MODE_PRIVATE)
         val sent = prefs.getBoolean(KEY_SENT, false)
         if (!sent) FirebaseMessaging.getInstance().deleteToken()
+    }
+
+    private fun delayNotificationPermission() {
+        lifecycleScope.launch {
+            kotlinx.coroutines.delay(1000) // 3 detik (ubah sesuai kebutuhan)
+            checkNotificationPermission()
+        }
     }
 }
