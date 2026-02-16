@@ -48,6 +48,7 @@ class MainActivity : AppCompatActivity() {
 
     private var isLoginInProgress = false
     private var hasRequestedNotification = false
+    private var notificationDialog: androidx.appcompat.app.AlertDialog? = null
 
     private var loginDialog: androidx.appcompat.app.AlertDialog? = null
 
@@ -115,10 +116,15 @@ class MainActivity : AppCompatActivity() {
 
             hasRequestedNotification = true
 
-            if (!isGranted) {
+            if (isGranted) {
+                // 🔥 langsung close dialog saat user allow
+                notificationDialog?.dismiss()
+                notificationDialog = null
+            } else {
                 checkNotificationPermission()
             }
         }
+
 
 
 
@@ -310,8 +316,11 @@ class MainActivity : AppCompatActivity() {
             Manifest.permission.POST_NOTIFICATIONS
         ) == PackageManager.PERMISSION_GRANTED
 
-        // ✅ Requirement 3
-        if (granted) return
+        if (granted) {
+            notificationDialog?.dismiss()
+            notificationDialog = null
+            return
+        }
 
         val permanentlyDenied =
             hasRequestedNotification &&
@@ -327,15 +336,21 @@ class MainActivity : AppCompatActivity() {
 
 
 
+
     private fun showPermissionDialog() {
-        MaterialAlertDialogBuilder(this)
+
+        if (notificationDialog?.isShowing == true) return
+
+        notificationDialog = MaterialAlertDialogBuilder(this)
             .setTitle("Aktifkan Notifikasi")
             .setMessage("Notifikasi wajib diaktifkan.")
             .setCancelable(false)
             .setPositiveButton("Aktifkan") { _, _ ->
                 permissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
             }
-            .show()
+            .create()
+
+        notificationDialog?.show()
     }
 
 
