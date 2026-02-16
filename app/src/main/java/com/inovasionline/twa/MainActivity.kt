@@ -171,7 +171,7 @@ class MainActivity : AppCompatActivity() {
             .getBoolean(KEY_LOGGED_IN, false)
 
         if (!loggedIn && !isLoginInProgress) {
-            showGoogleLoginDialog()
+            delayLoginDialog()
         }
 
         if (loggedIn) {
@@ -203,7 +203,7 @@ class MainActivity : AppCompatActivity() {
         val loggedIn = getSharedPreferences(PREF_LOGIN, MODE_PRIVATE)
             .getBoolean(KEY_LOGGED_IN, false)
 
-        if (!loggedIn) showGoogleLoginDialog()
+        if (!loggedIn) delayLoginDialog()
     }
 
     private fun showGoogleLoginDialog() {
@@ -455,4 +455,12 @@ class MainActivity : AppCompatActivity() {
             checkNotificationPermission()
         }
     }
+
+    private fun delayLoginDialog() {
+        lifecycleScope.launch {
+            kotlinx.coroutines.delay(1000)
+            showGoogleLoginDialog()
+        }
+    }
+
 }
