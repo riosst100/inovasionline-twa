@@ -49,6 +49,8 @@ class MainActivity : AppCompatActivity() {
     private var isLoginInProgress = false
     private var hasRequestedNotification = false
     private var isLoginDelayRunning = false
+    private var isRequestingPermission = false
+
 
     private var notificationDialog: androidx.appcompat.app.AlertDialog? = null
 
@@ -119,17 +121,16 @@ class MainActivity : AppCompatActivity() {
     private val permissionLauncher =
         registerForActivityResult(ActivityResultContracts.RequestPermission()) { isGranted ->
 
+            isRequestingPermission = false
             hasRequestedNotification = true
 
             if (isGranted) {
-                // 🔥 langsung close dialog saat user allow
                 notificationDialog?.dismiss()
                 notificationDialog = null
             } else {
                 checkNotificationPermission()
             }
         }
-
 
 
 
@@ -172,11 +173,11 @@ class MainActivity : AppCompatActivity() {
         val loggedIn = getSharedPreferences(PREF_LOGIN, MODE_PRIVATE)
             .getBoolean(KEY_LOGGED_IN, false)
 
-        if (!loggedIn && !isLoginInProgress) {
+        if (!loggedIn && !isLoginInProgress && !isRequestingPermission) {
             delayLoginDialog()
         }
 
-        if (loggedIn) {
+        if (loggedIn && !isRequestingPermission) {
 
             // 🔥 Tutup dialog kalau permission sudah diaktifkan dari Settings
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
@@ -369,6 +370,7 @@ class MainActivity : AppCompatActivity() {
             .setMessage("Notifikasi wajib diaktifkan.")
             .setCancelable(false)
             .setPositiveButton("Aktifkan") { _, _ ->
+                isRequestingPermission = true
                 permissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
             }
             .create()
@@ -453,23 +455,28 @@ class MainActivity : AppCompatActivity() {
 
     private fun delayNotificationPermission() {
         lifecycleScope.launch {
-            kotlinx.coroutines.delay(1500) // 3 detik (ubah sesuai kebutuhan)
+            kotlinx.coroutines.delay(1000) // 3 detik (ubah sesuai kebutuhan)
             checkNotificationPermission()
         }
     }
 
     private fun delayLoginDialog() {
 
-        if (isLoginDelayRunning) return
+        if (isLoginDelayRunning || isRequestingPermission) return
 
         isLoginDelayRunning = true
 
         lifecycleScope.launch {
             kotlinx.coroutines.delay(1000)
+
             isLoginDelayRunning = false
-            showGoogleLoginDialog()
+
+            if (!isRequestingPermission) {
+                showGoogleLoginDialog()
+            }
         }
     }
+
 
 
 }
