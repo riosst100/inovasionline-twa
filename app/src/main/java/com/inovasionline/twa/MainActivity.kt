@@ -10,32 +10,21 @@ import android.os.Bundle
 import android.provider.Settings
 import android.util.Log
 import android.view.View
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.SupervisorJob
-
 import android.webkit.CookieManager
 import android.webkit.WebView
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.cancel
-
-import kotlinx.coroutines.withContext
-
 import android.webkit.WebViewClient
+import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import androidx.core.net.toUri
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
-import androidx.credentials.*
-import androidx.credentials.exceptions.GetCredentialCancellationException
-import androidx.credentials.exceptions.GetCredentialException
-import androidx.interpolator.view.animation.FastOutSlowInInterpolator
-import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
-import com.google.android.libraries.identity.googleid.*
+import com.google.android.gms.auth.api.signin.*
+import com.google.android.gms.common.api.ApiException
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.firebase.messaging.FirebaseMessaging
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
@@ -47,26 +36,19 @@ class MainActivity : AppCompatActivity() {
 
     companion object {
         private const val TAG = "RIO_DEBUG"
-        private const val PREF = "push"
-        private const val KEY_SENT = "sent"
         private const val PREF_LOGIN = "login_pref"
         private const val KEY_LOGGED_IN = "logged_in"
+        private const val PREF = "push"
+        private const val KEY_SENT = "sent"
     }
 
     private lateinit var webView: WebView
     private lateinit var splashOverlay: View
-    private lateinit var credentialManager: CredentialManager
+    private lateinit var googleSignInClient: GoogleSignInClient
 
-    private var hasRequestedPermission = false
-    private var shouldAskPermissionAfterLogin = false
-    private var loginDialog: androidx.appcompat.app.AlertDialog? = null
-
-
-    private val loginScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
-
-    // ===== FIX TAMBAHAN =====
     private var isLoginInProgress = false
-    // =========================
+    private var hasRequestedNotification = false
+    private var loginDialog: androidx.appcompat.app.AlertDialog? = null
 
     private val HOME_URL = "https://inovasionline.com"
     private val BACKEND_URL =
@@ -75,11 +57,46 @@ class MainActivity : AppCompatActivity() {
     private val WEB_CLIENT_ID =
         "962366033380-169mr3kth1sl22fh94ek79ioalj7us4b.apps.googleusercontent.com"
 
+    // ================= GOOGLE LOGIN RESULT =================
+
+    private val googleLoginLauncher =
+        registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+
+            if (result.resultCode == RESULT_OK) {
+
+                val task = GoogleSignIn.getSignedInAccountFromIntent(result.data)
+
+                try {
+                    val account = task.getResult(ApiException::class.java)
+                    val idToken = account.idToken
+
+                    if (idToken != null) {
+                        sendTokenToBackend(idToken)
+                    } else {
+                        handleLoginFailed("ID Token null")
+                    }
+
+                } catch (e: Exception) {
+                    Log.e(TAG, "Google sign-in failed", e)
+                    handleLoginFailed("Login gagal")
+                }
+
+            } else {
+                handleLoginFailed("Login dibatalkan")
+            }
+        }
+
+    // ================= PERMISSION RESULT =================
+
     private val permissionLauncher =
         registerForActivityResult(ActivityResultContracts.RequestPermission()) { isGranted ->
-            hasRequestedPermission = true
-            if (!isGranted) checkNotificationPermission()
+            hasRequestedNotification = true
+            if (!isGranted) {
+                checkNotificationPermission()
+            }
         }
+
+    // ================= LIFECYCLE =================
 
     override fun onCreate(savedInstanceState: Bundle?) {
         installSplashScreen()
@@ -93,22 +110,17 @@ class MainActivity : AppCompatActivity() {
         cookieManager.setAcceptCookie(true)
         cookieManager.setAcceptThirdPartyCookies(webView, true)
 
-        credentialManager = CredentialManager.create(this)
+        val gso = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
+            .requestIdToken(WEB_CLIENT_ID)
+            .requestEmail()
+            .build()
+
+        googleSignInClient = GoogleSignIn.getClient(this, gso)
 
         setupWebView()
         checkLoginFirst()
         checkAndRefreshFcmTokenIfNeeded()
         PushRegistrar.ensureRegistered(this)
-        handleIncomingUrl(intent)
-    }
-
-    override fun onPause() {
-        super.onPause()
-        CookieManager.getInstance().flush()
-    }
-
-    override fun onDestroy() {
-        super.onDestroy()
     }
 
     override fun onResume() {
@@ -117,47 +129,36 @@ class MainActivity : AppCompatActivity() {
         val loggedIn = getSharedPreferences(PREF_LOGIN, MODE_PRIVATE)
             .getBoolean(KEY_LOGGED_IN, false)
 
-        Log.d(TAG, "onResume -> loggedIn=$loggedIn isLoginInProgress=$isLoginInProgress")
-
         if (!loggedIn && !isLoginInProgress) {
             showGoogleLoginDialog()
         }
-    }
 
-    private fun showLoading() {
-        splashOverlay.visibility = View.VISIBLE
-        splashOverlay.alpha = 1f
-    }
-
-    private fun hideLoadingSmooth() {
-        splashOverlay.animate()
-            .alpha(0f)
-            .setDuration(300)
-            .withEndAction {
-                splashOverlay.visibility = View.GONE
-            }
-            .start()
+        if (loggedIn) {
+            checkNotificationPermission()
+        }
     }
 
     // ================= LOGIN =================
 
     private fun checkLoginFirst() {
-        val prefs = getSharedPreferences(PREF_LOGIN, MODE_PRIVATE)
-        val loggedIn = prefs.getBoolean(KEY_LOGGED_IN, false)
+        val loggedIn = getSharedPreferences(PREF_LOGIN, MODE_PRIVATE)
+            .getBoolean(KEY_LOGGED_IN, false)
+
         if (!loggedIn) showGoogleLoginDialog()
     }
 
     private fun showGoogleLoginDialog() {
 
         if (loginDialog?.isShowing == true) return
+        if (isLoginInProgress) return
 
         loginDialog = MaterialAlertDialogBuilder(this)
             .setTitle("Login Diperlukan")
-            .setMessage("Untuk melanjutkan, silakan login menggunakan akun Google Anda.")
+            .setMessage("Silakan login menggunakan akun Google Anda.")
             .setCancelable(false)
             .setPositiveButton("Login dengan Google") { dialog, _ ->
-                dialog.dismiss()   // <<< PENTING
-                showGoogleLoginPopup()
+                dialog.dismiss()
+                startGoogleLogin()
             }
             .setNegativeButton("Keluar") { _, _ ->
                 finish()
@@ -167,120 +168,32 @@ class MainActivity : AppCompatActivity() {
         loginDialog?.show()
     }
 
-
-    private fun showGoogleLoginPopup() {
+    private fun startGoogleLogin() {
 
         if (isLoginInProgress) return
 
         isLoginInProgress = true
 
-        val googleIdOption = GetGoogleIdOption.Builder()
-            .setServerClientId(WEB_CLIENT_ID)
-            .setFilterByAuthorizedAccounts(false)
-            .setAutoSelectEnabled(false)
-            .build()
+        googleSignInClient.signOut()
 
-        val request = GetCredentialRequest.Builder()
-            .addCredentialOption(googleIdOption)
-            .build()
-
-        loginScope.launch {
-
-            try {
-
-                val result = credentialManager.getCredential(
-                    request = request,
-                    context = this@MainActivity
-                )
-
-                val credential = result.credential
-
-                if (credential is CustomCredential &&
-                    credential.type ==
-                    GoogleIdTokenCredential.TYPE_GOOGLE_ID_TOKEN_CREDENTIAL
-                ) {
-
-                    val googleIdTokenCredential =
-                        GoogleIdTokenCredential.createFrom(credential.data)
-
-                    val idToken = googleIdTokenCredential.idToken
-
-                    sendTokenToBackend(idToken)
-
-                } else {
-                    resetLoginState()
-                }
-
-
-            } catch (e: GetCredentialCancellationException) {
-
-                Log.e(TAG, "Login cancelled by user", e)
-                resetLoginState()
-
-                runOnUiThread {
-                    android.widget.Toast.makeText(
-                        this@MainActivity,
-                        "Login dibatalkan",
-                        android.widget.Toast.LENGTH_SHORT
-                    ).show()
-
-                    showGoogleLoginDialog()
-                }
-
-            } catch (e: GetCredentialException) {
-
-                Log.e(TAG, "Credential error", e)
-                resetLoginState()
-
-                runOnUiThread {
-                    android.widget.Toast.makeText(
-                        this@MainActivity,
-                        "Terjadi kesalahan login",
-                        android.widget.Toast.LENGTH_SHORT
-                    ).show()
-
-                    showGoogleLoginDialog()
-                }
-
-            } catch (e: Exception) {
-
-                if (e is java.util.concurrent.CancellationException) {
-                    Log.d(TAG, "Login coroutine cancelled normally")
-                    return@launch
-                }
-
-                Log.e(TAG, "Unknown login error", e)
-                resetLoginState()
-
-                runOnUiThread {
-                    android.widget.Toast.makeText(
-                        this@MainActivity,
-                        "Login gagal, coba lagi",
-                        android.widget.Toast.LENGTH_SHORT
-                    ).show()
-
-                    showGoogleLoginDialog()
-                }
-            }
-
-
-        }
-        }
-
-    private fun resetLoginState() {
-        isLoginInProgress = false
-        hideLoadingSmooth()
-
-        loginDialog?.dismiss()
-        loginDialog = null
+        val signInIntent = googleSignInClient.signInIntent
+        googleLoginLauncher.launch(signInIntent)
     }
 
+    private fun handleLoginFailed(message: String) {
+        isLoginInProgress = false
+        hideLoading()
+        Toast.makeText(this, message, Toast.LENGTH_SHORT).show()
+        showGoogleLoginDialog()
+    }
 
     // ================= BACKEND =================
 
     private fun sendTokenToBackend(idToken: String) {
 
-        loginScope.launch(Dispatchers.IO) {
+        showLoading()
+
+        lifecycleScope.launch(Dispatchers.IO) {
 
             try {
 
@@ -290,8 +203,6 @@ class MainActivity : AppCompatActivity() {
                 connection.requestMethod = "POST"
                 connection.setRequestProperty("Content-Type", "application/json")
                 connection.doOutput = true
-                connection.connectTimeout = 10000
-                connection.readTimeout = 10000
 
                 val body = JSONObject().apply {
                     put("idToken", idToken)
@@ -316,12 +227,11 @@ class MainActivity : AppCompatActivity() {
                         .apply()
 
                     withContext(Dispatchers.Main) {
-                        shouldAskPermissionAfterLogin = true
                         openBridgeLogin(accessToken)
                     }
 
                 } else {
-                    throw Exception("Backend error: $responseCode")
+                    throw Exception("Backend error")
                 }
 
             } catch (e: Exception) {
@@ -329,7 +239,7 @@ class MainActivity : AppCompatActivity() {
                 Log.e(TAG, "Backend error", e)
 
                 withContext(Dispatchers.Main) {
-                    resetLoginState()
+                    handleLoginFailed("Login gagal")
                 }
             }
         }
@@ -343,9 +253,71 @@ class MainActivity : AppCompatActivity() {
         webView.loadUrl(bridgeUrl)
 
         webView.postDelayed({
-            webView.loadUrl(HOME_URL)
+
             isLoginInProgress = false
-        }, 1000)
+            hideLoading()
+
+            checkNotificationPermission() // ✅ MUNCUL SETELAH LOGIN SAJA
+
+            webView.loadUrl(HOME_URL)
+
+        }, 800)
+    }
+
+    // ================= NOTIFICATION =================
+
+    private fun checkNotificationPermission() {
+
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return
+
+        val granted = ContextCompat.checkSelfPermission(
+            this,
+            Manifest.permission.POST_NOTIFICATIONS
+        ) == PackageManager.PERMISSION_GRANTED
+
+        if (granted) return
+
+        val permanentlyDenied =
+            hasRequestedNotification &&
+                    !shouldShowRequestPermissionRationale(
+                        Manifest.permission.POST_NOTIFICATIONS
+                    )
+
+        if (permanentlyDenied) {
+            showSettingsDialog()
+        } else {
+            showPermissionDialog()
+        }
+    }
+
+    private fun showPermissionDialog() {
+        MaterialAlertDialogBuilder(this)
+            .setTitle("Aktifkan Notifikasi")
+            .setMessage("Notifikasi wajib diaktifkan.")
+            .setCancelable(false)
+            .setPositiveButton("Aktifkan") { _, _ ->
+                permissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+            }
+            .show()
+    }
+
+    private fun showSettingsDialog() {
+        MaterialAlertDialogBuilder(this)
+            .setTitle("Notifikasi Diblokir")
+            .setMessage("Silakan aktifkan melalui Pengaturan.")
+            .setCancelable(false)
+            .setPositiveButton("Buka Pengaturan") { _, _ ->
+                openAppSettings()
+            }
+            .show()
+    }
+
+    private fun openAppSettings() {
+        val intent = Intent(
+            Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+            "package:$packageName".toUri()
+        )
+        startActivity(intent)
     }
 
     // ================= WEBVIEW =================
@@ -371,101 +343,22 @@ class MainActivity : AppCompatActivity() {
                 view: WebView?,
                 url: String?
             ) {
-
-                webView.postDelayed({
-
-                    webView.alpha = 0f
-                    webView.scaleX = 1.02f
-                    webView.scaleY = 1.02f
-                    webView.visibility = View.VISIBLE
-
-                    webView.animate()
-                        .alpha(1f)
-                        .scaleX(1f)
-                        .scaleY(1f)
-                        .setDuration(400)
-                        .setInterpolator(FastOutSlowInInterpolator())
-                        .start()
-
-                    hideLoadingSmooth()
-
-                    if (shouldAskPermissionAfterLogin) {
-                        shouldAskPermissionAfterLogin = false
-                        webView.postDelayed({
-                            checkNotificationPermission()
-                        }, 3000)
-                    }
-
-                }, 120)
+                webView.visibility = View.VISIBLE
+                hideLoading()
             }
         }
 
         webView.loadUrl(HOME_URL)
     }
 
-    // ================= PERMISSION =================
+    // ================= UI =================
 
-    private fun checkNotificationPermission() {
-
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return
-
-        val granted = ContextCompat.checkSelfPermission(
-            this,
-            Manifest.permission.POST_NOTIFICATIONS
-        ) == PackageManager.PERMISSION_GRANTED
-
-        if (granted) return
-
-        val isPermanentDenied =
-            hasRequestedPermission &&
-                    !shouldShowRequestPermissionRationale(
-                        Manifest.permission.POST_NOTIFICATIONS
-                    )
-
-        if (isPermanentDenied) showSettingsDialog()
-        else showPrePermissionDialog()
+    private fun showLoading() {
+        splashOverlay.visibility = View.VISIBLE
     }
 
-    private fun showPrePermissionDialog() {
-        MaterialAlertDialogBuilder(this)
-            .setTitle("Aktifkan Notifikasi")
-            .setMessage("Untuk melanjutkan, aktifkan notifikasi.")
-            .setCancelable(false)
-            .setPositiveButton("Aktifkan") { _, _ ->
-                permissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
-            }
-            .setNegativeButton("Keluar") { _, _ ->
-                finish()
-            }
-            .show()
-    }
-
-    private fun showSettingsDialog() {
-        MaterialAlertDialogBuilder(this)
-            .setTitle("Notifikasi Diblokir")
-            .setMessage("Silakan aktifkan melalui Pengaturan.")
-            .setCancelable(false)
-            .setPositiveButton("Buka Pengaturan") { _, _ ->
-                openAppSettings()
-            }
-            .setNegativeButton("Keluar") { _, _ ->
-                finish()
-            }
-            .show()
-    }
-
-    private fun openAppSettings() {
-        val intent = Intent(
-            Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
-            "package:$packageName".toUri()
-        )
-        startActivity(intent)
-    }
-
-    private fun handleIncomingUrl(intent: Intent?) {
-        val url = intent?.getStringExtra("open_url")
-            ?: intent?.dataString
-        if (!url.isNullOrBlank()) webView.loadUrl(url)
+    private fun hideLoading() {
+        splashOverlay.visibility = View.GONE
     }
 
     private fun checkAndRefreshFcmTokenIfNeeded() {

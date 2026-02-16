@@ -61,11 +61,13 @@ dependencies {
     implementation("com.google.android.libraries.identity.googleid:googleid:1.2.0")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.2")
 
-    implementation(libs.androidx.lifecycle.runtime.ktx)
+    implementation("com.google.android.gms:play-services-auth:21.5.0")
+
     implementation(libs.kotlinx.coroutines.android)
 
     implementation(libs.androidx.browser)
     implementation(libs.androidbrowserhelper)
+    implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.10.0")
     implementation(libs.androidx.core.splashscreen)
 
     implementation(libs.play.services.auth)
