@@ -48,6 +48,8 @@ class MainActivity : AppCompatActivity() {
 
     private var isLoginInProgress = false
     private var hasRequestedNotification = false
+    private var isLoginDelayRunning = false
+
     private var notificationDialog: androidx.appcompat.app.AlertDialog? = null
 
     private var loginDialog: androidx.appcompat.app.AlertDialog? = null
@@ -457,10 +459,17 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun delayLoginDialog() {
+
+        if (isLoginDelayRunning) return
+
+        isLoginDelayRunning = true
+
         lifecycleScope.launch {
             kotlinx.coroutines.delay(1000)
+            isLoginDelayRunning = false
             showGoogleLoginDialog()
         }
     }
+
 
 }
