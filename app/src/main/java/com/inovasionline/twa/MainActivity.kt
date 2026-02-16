@@ -48,6 +48,7 @@ class MainActivity : AppCompatActivity() {
 
     private var isLoginInProgress = false
     private var hasRequestedNotification = false
+
     private var loginDialog: androidx.appcompat.app.AlertDialog? = null
 
     private val HOME_URL = "https://inovasionline.com"
@@ -59,40 +60,67 @@ class MainActivity : AppCompatActivity() {
 
     // ================= GOOGLE LOGIN RESULT =================
 
-    private val googleLoginLauncher =
-        registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+    private val googleLoginLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
 
-            if (result.resultCode == RESULT_OK) {
+        Log.d(TAG, "Google resultCode: ${result.resultCode}")
 
-                val task = GoogleSignIn.getSignedInAccountFromIntent(result.data)
+        val data = result.data
 
-                try {
-                    val account = task.getResult(ApiException::class.java)
-                    val idToken = account.idToken
-
-                    if (idToken != null) {
-                        sendTokenToBackend(idToken)
-                    } else {
-                        handleLoginFailed("ID Token null")
-                    }
-
-                } catch (e: Exception) {
-                    Log.e(TAG, "Google sign-in failed", e)
-                    handleLoginFailed("Login gagal")
-                }
-
-            }
+        if (data == null) {
+            Log.e(TAG, "Intent data NULL")
         }
+
+        val task = GoogleSignIn.getSignedInAccountFromIntent(data)
+
+        try {
+            val account = task.getResult(ApiException::class.java)
+            val idToken = account.idToken
+
+            Log.d(TAG, "Google login SUCCESS")
+
+            if (idToken != null) {
+                sendTokenToBackend(idToken)
+            } else {
+                Log.e(TAG, "ID Token NULL")
+                handleLoginFailed("ID Token null")
+            }
+
+        } catch (e: ApiException) {
+
+            Log.e(TAG, "Google Sign-In ApiException")
+            Log.e(TAG, "Status code: ${e.statusCode}")
+            Log.e(TAG, "Status message: ${e.message}")
+
+            handleLoginCancelled()
+
+        } catch (e: Exception) {
+
+            Log.e(TAG, "Unknown exception", e)
+            handleLoginCancelled()
+        }
+    }
+
+    private fun handleLoginCancelled() {
+        isLoginInProgress = false
+
+        // munculkan popup lagi
+        showGoogleLoginDialog()
+    }
+
 
     // ================= PERMISSION RESULT =================
 
     private val permissionLauncher =
         registerForActivityResult(ActivityResultContracts.RequestPermission()) { isGranted ->
+
             hasRequestedNotification = true
+
             if (!isGranted) {
                 checkNotificationPermission()
             }
         }
+
+
 
     // ================= LIFECYCLE =================
 
@@ -138,7 +166,7 @@ class MainActivity : AppCompatActivity() {
         }
 
         if (loggedIn) {
-            checkNotificationPermission()
+            delayNotificationPermission()
         }
     }
 
@@ -282,13 +310,12 @@ class MainActivity : AppCompatActivity() {
             Manifest.permission.POST_NOTIFICATIONS
         ) == PackageManager.PERMISSION_GRANTED
 
+        // ✅ Requirement 3
         if (granted) return
 
         val permanentlyDenied =
             hasRequestedNotification &&
-                    !shouldShowRequestPermissionRationale(
-                        Manifest.permission.POST_NOTIFICATIONS
-                    )
+                    !shouldShowRequestPermissionRationale(Manifest.permission.POST_NOTIFICATIONS)
 
         if (permanentlyDenied) {
             showSettingsDialog()
@@ -296,6 +323,9 @@ class MainActivity : AppCompatActivity() {
             showPermissionDialog()
         }
     }
+
+
+
 
     private fun showPermissionDialog() {
         MaterialAlertDialogBuilder(this)
@@ -307,6 +337,7 @@ class MainActivity : AppCompatActivity() {
             }
             .show()
     }
+
 
     private fun showSettingsDialog() {
         MaterialAlertDialogBuilder(this)
@@ -376,7 +407,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun delayNotificationPermission() {
         lifecycleScope.launch {
-            kotlinx.coroutines.delay(1000) // 3 detik (ubah sesuai kebutuhan)
+            kotlinx.coroutines.delay(1500) // 3 detik (ubah sesuai kebutuhan)
             checkNotificationPermission()
         }
     }
