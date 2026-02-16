@@ -51,6 +51,9 @@ class MainActivity : AppCompatActivity() {
     private var notificationDialog: androidx.appcompat.app.AlertDialog? = null
 
     private var loginDialog: androidx.appcompat.app.AlertDialog? = null
+    private var settingsDialog: androidx.appcompat.app.AlertDialog? = null
+
+
 
     private val HOME_URL = "https://inovasionline.com"
     private val BACKEND_URL =
@@ -172,9 +175,27 @@ class MainActivity : AppCompatActivity() {
         }
 
         if (loggedIn) {
+
+            // 🔥 Tutup dialog kalau permission sudah diaktifkan dari Settings
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                val granted = ContextCompat.checkSelfPermission(
+                    this,
+                    Manifest.permission.POST_NOTIFICATIONS
+                ) == PackageManager.PERMISSION_GRANTED
+
+                if (granted) {
+                    notificationDialog?.dismiss()
+                    settingsDialog?.dismiss()
+                    notificationDialog = null
+                    settingsDialog = null
+                    return
+                }
+            }
+
             delayNotificationPermission()
         }
     }
+
 
     // ================= LOGIN =================
 
@@ -355,15 +376,23 @@ class MainActivity : AppCompatActivity() {
 
 
     private fun showSettingsDialog() {
-        MaterialAlertDialogBuilder(this)
+
+        if (settingsDialog?.isShowing == true) return
+
+        settingsDialog = MaterialAlertDialogBuilder(this)
             .setTitle("Notifikasi Diblokir")
             .setMessage("Silakan aktifkan melalui Pengaturan.")
             .setCancelable(false)
             .setPositiveButton("Buka Pengaturan") { _, _ ->
+                notificationDialog?.dismiss()
+                notificationDialog = null
                 openAppSettings()
             }
-            .show()
+            .create()
+
+        settingsDialog?.show()
     }
+
 
     private fun openAppSettings() {
         val intent = Intent(
