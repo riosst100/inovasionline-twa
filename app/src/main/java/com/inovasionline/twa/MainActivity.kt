@@ -30,6 +30,7 @@ import kotlinx.coroutines.withContext
 import org.json.JSONObject
 import java.net.HttpURLConnection
 import java.net.URL
+import androidx.swiperefreshlayout.widget.SwipeRefreshLayout
 
 @SuppressLint("InlinedApi")
 class MainActivity : AppCompatActivity() {
@@ -45,6 +46,8 @@ class MainActivity : AppCompatActivity() {
     private lateinit var webView: WebView
     private lateinit var splashOverlay: View
     private lateinit var googleSignInClient: GoogleSignInClient
+
+    private lateinit var swipeRefresh: SwipeRefreshLayout
 
     private var isLoginInProgress = false
     private var hasRequestedNotification = false
@@ -131,12 +134,25 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
+        swipeRefresh = findViewById(R.id.swipeRefresh)
+
+        swipeRefresh.setOnRefreshListener {
+            webView.reload()
+        }
+
         webView = findViewById(R.id.webView)
         webView.settings.setDomStorageEnabled(true)
         WebView.setWebContentsDebuggingEnabled(true)
         webView.settings.mixedContentMode =
             android.webkit.WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
         webView.settings.setDatabaseEnabled(true)
+        webView.setOnScrollChangeListener { _, _, scrollY, _, _ ->
+            swipeRefresh.isEnabled = scrollY == 0
+        }
+
+        swipeRefresh.setColorSchemeResources(
+            R.color.primary
+        )
 
         splashOverlay = findViewById(R.id.splashOverlay)
 
@@ -428,6 +444,8 @@ class MainActivity : AppCompatActivity() {
 
             override fun onPageFinished(view: WebView?, url: String?) {
                 super.onPageFinished(view, url)
+
+                swipeRefresh.isRefreshing = false
 
                 if (url == "https://inovasionline.com/" ||
                     url == "https://inovasionline.com") {
