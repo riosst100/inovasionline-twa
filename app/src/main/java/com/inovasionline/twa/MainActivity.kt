@@ -142,6 +142,12 @@ class MainActivity : AppCompatActivity() {
         setContentView(R.layout.activity_main)
 
         webView = findViewById(R.id.webView)
+        webView.settings.setDomStorageEnabled(true)
+        WebView.setWebContentsDebuggingEnabled(true)
+        webView.settings.mixedContentMode =
+            android.webkit.WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
+        webView.settings.setDatabaseEnabled(true)
+
         splashOverlay = findViewById(R.id.splashOverlay)
 
         val cookieManager = CookieManager.getInstance()
@@ -417,6 +423,21 @@ class MainActivity : AppCompatActivity() {
         webView.visibility = View.INVISIBLE
         webView.settings.javaScriptEnabled = true
         webView.settings.domStorageEnabled = true
+        webView.settings.apply {
+
+            javaScriptEnabled = true
+            domStorageEnabled = true
+            databaseEnabled = true
+
+            // 🔥 Gunakan default browser cache behavior
+            cacheMode = android.webkit.WebSettings.LOAD_DEFAULT
+
+            useWideViewPort = true
+            loadWithOverviewMode = true
+            loadsImagesAutomatically = true
+
+            mediaPlaybackRequiresUserGesture = false
+        }
 
         webView.webViewClient = object : WebViewClient() {
 
