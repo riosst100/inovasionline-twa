@@ -149,6 +149,9 @@ class MainActivity : AppCompatActivity() {
         cookieManager.setAcceptThirdPartyCookies(webView, true)
         cookieManager.flush();
 
+        val cookies = CookieManager.getInstance().getCookie("https://inovasionline.com")
+        Log.d(TAG, "Cookies: $cookies")
+
         val gso = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
             .requestIdToken(WEB_CLIENT_ID)
             .requestEmail()
@@ -317,7 +320,7 @@ class MainActivity : AppCompatActivity() {
         webView.postDelayed({
 
             // 🔥 FLUSH COOKIE WAJIB
-            CookieManager.getInstance().flush()
+//            CookieManager.getInstance().flush()
 
             isLoginInProgress = false
             hideLoading()
@@ -416,6 +419,17 @@ class MainActivity : AppCompatActivity() {
         webView.settings.domStorageEnabled = true
 
         webView.webViewClient = object : WebViewClient() {
+
+            override fun onPageFinished(view: WebView?, url: String?) {
+                super.onPageFinished(view, url)
+
+                if (url == "https://inovasionline.com/" ||
+                    url == "https://inovasionline.com") {
+
+                    Log.d("COOKIE_DEBUG", "Homepage loaded. Flushing cookie.")
+                    CookieManager.getInstance().flush()
+                }
+            }
 
             override fun onPageStarted(
                 view: WebView?,
