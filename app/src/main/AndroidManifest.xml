@@ -15,9 +15,9 @@
 
         <!-- MainActivity TANPA intent-filter -->
         <activity
+            android:launchMode="singleInstance"
             android:name=".MainActivity"
             android:theme="@style/Theme.InovasiOnline.Splash"
-            android:launchMode="singleTop"
             android:exported="true">
         <intent-filter>
             <action android:name="android.intent.action.MAIN" />

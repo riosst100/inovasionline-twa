@@ -68,45 +68,35 @@ class MainActivity : AppCompatActivity() {
 
     // ================= GOOGLE LOGIN RESULT =================
 
-    private val googleLoginLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+    private val googleLoginLauncher =
+        registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
 
-        Log.d(TAG, "Google resultCode: ${result.resultCode}")
+            isLoginInProgress = false
 
-        val data = result.data
-
-        if (data == null) {
-            Log.e(TAG, "Intent data NULL")
-        }
-
-        val task = GoogleSignIn.getSignedInAccountFromIntent(data)
-
-        try {
-            val account = task.getResult(ApiException::class.java)
-            val idToken = account.idToken
-
-            Log.d(TAG, "Google login SUCCESS")
-
-            if (idToken != null) {
-                sendTokenToBackend(idToken)
-            } else {
-                Log.e(TAG, "ID Token NULL")
-                handleLoginFailed("ID Token null")
+            if (result.resultCode != RESULT_OK) {
+                val string = "cancelled"
+                handleLoginCancelled()
+                Log.e(TAG, "Login $string: ${result.resultCode}")
+                return@registerForActivityResult
             }
 
-        } catch (e: ApiException) {
+            val task = GoogleSignIn.getSignedInAccountFromIntent(result.data)
 
-            Log.e(TAG, "Google Sign-In ApiException")
-            Log.e(TAG, "Status code: ${e.statusCode}")
-            Log.e(TAG, "Status message: ${e.message}")
+            try {
+                val account = task.getResult(ApiException::class.java)
+                val idToken = account.idToken
 
-            handleLoginCancelled()
+                if (idToken != null) {
+                    sendTokenToBackend(idToken)
+                } else {
+                    Log.e(TAG, "ID Token null")
+                }
 
-        } catch (e: Exception) {
-
-            Log.e(TAG, "Unknown exception", e)
-            handleLoginCancelled()
+            } catch (e: ApiException) {
+                Log.e(TAG, "Google Sign-In failed: ${e.statusCode}")
+            }
         }
-    }
+
 
     private fun handleLoginCancelled() {
         isLoginInProgress = false
@@ -182,13 +172,8 @@ class MainActivity : AppCompatActivity() {
         val loggedIn = getSharedPreferences(PREF_LOGIN, MODE_PRIVATE)
             .getBoolean(KEY_LOGGED_IN, false)
 
-        if (!loggedIn && !isLoginInProgress && !isRequestingPermission) {
-            delayLoginDialog()
-        }
-
         if (loggedIn && !isRequestingPermission) {
 
-            // 🔥 Tutup dialog kalau permission sudah diaktifkan dari Settings
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                 val granted = ContextCompat.checkSelfPermission(
                     this,
@@ -245,7 +230,7 @@ class MainActivity : AppCompatActivity() {
 
         isLoginInProgress = true
 
-        googleSignInClient.signOut()
+//        googleSignInClient.signOut()
 
         val signInIntent = googleSignInClient.signInIntent
         googleLoginLauncher.launch(signInIntent)
@@ -295,7 +280,7 @@ class MainActivity : AppCompatActivity() {
                     getSharedPreferences(PREF_LOGIN, MODE_PRIVATE)
                         .edit()
                         .putBoolean(KEY_LOGGED_IN, true)
-                        .apply()
+                        .commit()
 
                     withContext(Dispatchers.Main) {
                         openBridgeLogin(accessToken)
