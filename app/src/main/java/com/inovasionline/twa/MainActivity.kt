@@ -172,6 +172,7 @@ class MainActivity : AppCompatActivity() {
         googleSignInClient = GoogleSignIn.getClient(this, gso)
 
         setupWebView()
+
         checkLoginFirst()
         checkAndRefreshFcmTokenIfNeeded()
         PushRegistrar.ensureRegistered(this)
@@ -473,6 +474,40 @@ class MainActivity : AppCompatActivity() {
         }
 
         webView.loadUrl(HOME_URL)
+
+        onBackPressedDispatcher.addCallback(
+            this,
+            object : androidx.activity.OnBackPressedCallback(true) {
+                override fun handleOnBackPressed() {
+
+                    val currentUrl = webView.url ?: ""
+                    val isHome = currentUrl == "https://inovasionline.com/" ||
+                            currentUrl == "https://inovasionline.com"
+
+                    if (isHome) {
+                        showExitConfirmation()
+                    } else if (webView.canGoBack()) {
+                        webView.goBack()
+                    } else {
+                        showExitConfirmation()
+                    }
+                }
+            }
+        )
+
+    }
+
+    private fun showExitConfirmation() {
+
+        MaterialAlertDialogBuilder(this)
+            .setTitle("Keluar Aplikasi")
+            .setMessage("Apakah Anda yakin ingin keluar?")
+            .setCancelable(true)
+            .setPositiveButton("Ya") { _, _ ->
+                finish()
+            }
+            .setNegativeButton("Tidak", null)
+            .show()
     }
 
     // ================= UI =================
